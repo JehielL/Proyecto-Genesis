@@ -19,6 +19,14 @@ export class GameComponent implements OnInit {
   private walls: THREE.Mesh[] = [];
   private collisionRadius = 0.6;
 
+  private textureLoader = new THREE.TextureLoader();
+
+  // Cargamos las texturas desde la carpeta assets
+  private wallTexture = this.textureLoader.load('https://i.ibb.co/KcF96vpW/3.png');
+  private player1Texture = this.textureLoader.load('https://i.ibb.co/tpMTKZZR/astronaut.png');
+  private player2Texture = this.textureLoader.load('https://i.ibb.co/QjPTtG0c/astronaut2.png');
+  private oxygenTexture = this.textureLoader.load('https://i.ibb.co/wNbdzMNg/Shattered-Planet7.png');
+
   // 🔹 Mapa con dos jugadores (P y J)
   private mapData: string[] = [
     "1111111111111111111111",
@@ -28,7 +36,7 @@ export class GameComponent implements OnInit {
     "110000000O00O00000001",
     "100000000000000000000",
     "100000000000000000000",
-    "10000000J0000000000000", // J representa al segundo jugador
+    "10000000J0000000000000",
     "100000000000000000000",
     "111111111111111111111"
   ];
@@ -47,7 +55,7 @@ export class GameComponent implements OnInit {
     this.scene.background = new THREE.Color(0x000000);
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.z = 10;
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvasRef.nativeElement });
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvasRef.nativeElement, alpha: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(this.renderer.domElement);
   }
@@ -68,13 +76,13 @@ export class GameComponent implements OnInit {
   }
 
   private generateMap() {
-    const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
-    const player1Material = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-    const player2Material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-    const oxygenMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const wallMaterial = new THREE.MeshBasicMaterial({ map: this.wallTexture });
+    const player1Material = new THREE.MeshBasicMaterial({ map: this.player1Texture, transparent: true });
+    const player2Material = new THREE.MeshBasicMaterial({ map: this.player2Texture, transparent: true });
+    const oxygenMaterial = new THREE.MeshBasicMaterial({ map: this.oxygenTexture });
 
     const wallGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const playerGeometry = new THREE.SphereGeometry(0.5, 32, 32);
+    const playerGeometry = new THREE.PlaneGeometry(1, 1.5); // 📌 Plano para imágenes 2D
     const oxygenGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.3, 32);
 
     for (let y = 0; y < this.mapData.length; y++) {
@@ -103,9 +111,10 @@ export class GameComponent implements OnInit {
     this.walls.push(wall);
   }
 
-  private addPlayer(x: number, y: number, geometry: THREE.SphereGeometry, material: THREE.MeshBasicMaterial, controls: any) {
+  private addPlayer(x: number, y: number, geometry: THREE.PlaneGeometry, material: THREE.MeshBasicMaterial, controls: any) {
     const player = new THREE.Mesh(geometry, material);
     player.position.set(x, y, 0);
+    player.lookAt(this.camera.position); // 📌 Hacemos que siempre mire hacia la cámara
     this.scene.add(player);
     this.players.push({ mesh: player, controls });
   }
