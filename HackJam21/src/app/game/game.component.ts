@@ -13,7 +13,13 @@ export class GameComponent implements OnInit {
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
-  private players: { mesh: THREE.Mesh, controls: any }[] = [];
+  private player!: { 
+    mesh: THREE.Mesh, 
+    controls: any, 
+    textures: { [key: string]: THREE.Texture[] }, 
+    currentTextureIndex: number,
+    direction: string
+  };
   private oxygenTank!: THREE.Mesh;
   private stars: THREE.Points | null = null;
   private walls: THREE.Mesh[] = [];
@@ -21,13 +27,31 @@ export class GameComponent implements OnInit {
 
   private textureLoader = new THREE.TextureLoader();
 
-  // Cargamos las texturas desde la carpeta assets
+  // Texturas del mapa
   private wallTexture = this.textureLoader.load('https://i.ibb.co/KcF96vpW/3.png');
-  private player1Texture = this.textureLoader.load('https://i.ibb.co/tpMTKZZR/astronaut.png');
-  private player2Texture = this.textureLoader.load('https://i.ibb.co/QjPTtG0c/astronaut2.png');
   private oxygenTexture = this.textureLoader.load('https://i.ibb.co/wNbdzMNg/Shattered-Planet7.png');
 
-  // 🔹 Mapa con dos jugadores (P y J)
+  // Texturas del personaje P
+  private playerTextures: { [key: string]: THREE.Texture[] } = {
+    'right': [
+      this.textureLoader.load('https://i.ibb.co/xKwcLM6g/step1-removebg.png'),
+      this.textureLoader.load('https://i.ibb.co/dS5ppNW/step2-removebg.png')
+    ],
+    'left': [
+      this.textureLoader.load('https://i.ibb.co/xKwcLM6g/step1-removebg.png'),
+      this.textureLoader.load('https://i.ibb.co/dS5ppNW/step2-removebg.png')
+    ],
+    'up': [
+      this.textureLoader.load('https://i.ibb.co/xKwcLM6g/step1-removebg.png'),
+      this.textureLoader.load('https://i.ibb.co/dS5ppNW/step2-removebg.png')
+    ],
+    'down': [
+      this.textureLoader.load('https://i.ibb.co/xKwcLM6g/step1-removebg.png'),
+      this.textureLoader.load('https://i.ibb.co/dS5ppNW/step2-removebg.png')
+    ]
+  };
+
+  // Mapa con un solo jugador (P)
   private mapData: string[] = [
     "1111111111111111111111",
     "110000000000000O00001",
@@ -36,7 +60,7 @@ export class GameComponent implements OnInit {
     "110000000O00O00000001",
     "100000000000000000000",
     "100000000000000000000",
-    "10000000J0000000000000",
+    "1000000000000000000000",
     "100000000000000000000",
     "111111111111111111111"
   ];
@@ -47,7 +71,18 @@ export class GameComponent implements OnInit {
     this.initThreeJS();
     this.createStars();
     this.generateMap();
-    this.animate();
+    this.animateScene();
+  }
+
+  private animateScene() {
+    requestAnimationFrame(() => this.animateScene());
+
+    // Animación del fondo de estrellas
+    if (this.stars) {
+      this.stars.rotation.y += 0.0005;
+    }
+
+    this.renderer.render(this.scene, this.camera);
   }
 
   private initThreeJS() {
@@ -76,14 +111,11 @@ export class GameComponent implements OnInit {
   }
 
   private generateMap() {
-    const wallMaterial = new THREE.MeshBasicMaterial({ map: this.wallTexture });
-    const player1Material = new THREE.MeshBasicMaterial({ map: this.player1Texture, transparent: true });
-    const player2Material = new THREE.MeshBasicMaterial({ map: this.player2Texture, transparent: true });
-    const oxygenMaterial = new THREE.MeshBasicMaterial({ map: this.oxygenTexture });
-
     const wallGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const playerGeometry = new THREE.PlaneGeometry(1, 1.5); // 📌 Plano para imágenes 2D
+    const wallMaterial = new THREE.MeshBasicMaterial({ map: this.wallTexture });
     const oxygenGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.3, 32);
+    const oxygenMaterial = new THREE.MeshBasicMaterial({ map: this.oxygenTexture });
+    const playerGeometry = new THREE.PlaneGeometry(1, 1.5);
 
     for (let y = 0; y < this.mapData.length; y++) {
       for (let x = 0; x < this.mapData[y].length; x++) {
@@ -94,9 +126,7 @@ export class GameComponent implements OnInit {
         if (char === '1') {
           this.addWall(posX, posY, wallGeometry, wallMaterial);
         } else if (char === 'P') {
-          this.addPlayer(posX, posY, playerGeometry, player1Material, { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' });
-        } else if (char === 'J') {
-          this.addPlayer(posX, posY, playerGeometry, player2Material, { up: 'w', down: 's', left: 'a', right: 'd' });
+          this.addPlayer(posX, posY, playerGeometry, this.playerTextures, { up: 'w', down: 's', left: 'a', right: 'd' });
         } else if (char === 'O') {
           this.addOxygenTank(posX, posY, oxygenGeometry, oxygenMaterial);
         }
@@ -104,19 +134,19 @@ export class GameComponent implements OnInit {
     }
   }
 
+  private addPlayer(x: number, y: number, geometry: THREE.PlaneGeometry, textures: { [key: string]: THREE.Texture[] }, controls: any) {
+    const material = new THREE.MeshBasicMaterial({ map: textures['right'][0], transparent: true });
+    const player = new THREE.Mesh(geometry, material);
+    player.position.set(x, y, 0);
+    this.scene.add(player);
+    this.player = { mesh: player, controls, textures, currentTextureIndex: 0, direction: 'right' };
+  }
+
   private addWall(x: number, y: number, geometry: THREE.BoxGeometry, material: THREE.MeshBasicMaterial) {
     const wall = new THREE.Mesh(geometry, material);
     wall.position.set(x, y, 0);
     this.scene.add(wall);
     this.walls.push(wall);
-  }
-
-  private addPlayer(x: number, y: number, geometry: THREE.PlaneGeometry, material: THREE.MeshBasicMaterial, controls: any) {
-    const player = new THREE.Mesh(geometry, material);
-    player.position.set(x, y, 0);
-    player.lookAt(this.camera.position); // 📌 Hacemos que siempre mire hacia la cámara
-    this.scene.add(player);
-    this.players.push({ mesh: player, controls });
   }
 
   private addOxygenTank(x: number, y: number, geometry: THREE.CylinderGeometry, material: THREE.MeshBasicMaterial) {
@@ -127,43 +157,34 @@ export class GameComponent implements OnInit {
 
   @HostListener('document:keydown', ['$event'])
   handleKeyDown(event: KeyboardEvent) {
-    console.log(`Key pressed: ${event.key}`);
     const speed = 0.5;
-    this.players.forEach(player => {
-      let newX = player.mesh.position.x;
-      let newY = player.mesh.position.y;
-      if (event.key === player.controls.up) newY += speed;
-      if (event.key === player.controls.down) newY -= speed;
-      if (event.key === player.controls.left) newX -= speed;
-      if (event.key === player.controls.right) newX += speed;
-      if (!this.isColliding(newX, newY)) {
-        player.mesh.position.set(newX, newY, 0);
-      }
-    });
-    this.checkWinCondition();
-  }
+    let newX = this.player.mesh.position.x;
+    let newY = this.player.mesh.position.y;
 
-  private isColliding(x: number, y: number): boolean {
-    return this.walls.some(wall => {
-      const distance = Math.sqrt(Math.pow(wall.position.x - x, 2) + Math.pow(wall.position.y - y, 2));
-      return distance < this.collisionRadius + 0.3;
-    });
-  }
+    let newDirection = this.player.direction;
 
-  private checkWinCondition() {
-    this.players.forEach((player, index) => {
-      const distance = player.mesh.position.distanceTo(this.oxygenTank.position);
-      if (distance < 0.5) {
-        alert(`¡Jugador ${index + 1} ha ganado!`);
-      }
-    });
-  }
-
-  private animate() {
-    requestAnimationFrame(() => this.animate());
-    if (this.stars) {
-      this.stars.rotation.y += 0.0005;
+    if (event.key === this.player.controls.right) {
+      newX += speed;
+      newDirection = 'right';
+      this.player.mesh.scale.x = 1; 
     }
-    this.renderer.render(this.scene, this.camera);
+    if (event.key === this.player.controls.left) {
+      newX -= speed;
+      newDirection = 'left';
+      this.player.mesh.scale.x = -1; 
+    }
+    if (event.key === this.player.controls.up) {
+      newY += speed;
+      newDirection = 'up';
+    }
+    if (event.key === this.player.controls.down) {
+      newY -= speed;
+      newDirection = 'down';
+    }
+
+    this.player.currentTextureIndex = (this.player.currentTextureIndex + 1) % this.player.textures[newDirection].length;
+    (this.player.mesh.material as THREE.MeshBasicMaterial).map = this.player.textures[newDirection][this.player.currentTextureIndex];
+
+    this.player.mesh.position.set(newX, newY, 0);
   }
 }
